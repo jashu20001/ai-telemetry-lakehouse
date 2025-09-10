@@ -20,7 +20,7 @@ This README will be built step-by-step. Next we’ll add architecture, prerequis
 ## 🚀 Quickstart
 
 ### 1) Start the infrastructure
-```bash
+
 docker compose up -d
 
 This brings up:
@@ -31,7 +31,7 @@ This brings up:
 - **MinIO Console** on `9001` (login: `minioadmin/minioadmin`)
 ### 2) Generate demo events
 
-```bash
+
 # If your venv isn’t active yet:
 source .venv/bin/activate
 
@@ -45,7 +45,7 @@ This publishes synthetic LLM prompts/responses to the Kafka topics
 llm.prompts and llm.responses.
 ### 3) Ingest Kafka to MinIO (Bronze)
 
-```bash
+
 # MinIO defaults (change if you customized them)
 export MINIO_ENDPOINT=http://localhost:9000
 export MINIO_KEY=minioadmin
@@ -65,7 +65,7 @@ s3://llm-pulse/bronze/....
 This step reads the raw **Bronze** parquet files from MinIO and writes cleaned **Silver** datasets
 plus an aggregated **Gold** table used by the dashboard.
 
-```bash
+
 # Uses the same env as Step 3 (override if you changed them)
 export MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://localhost:9000}
 export MINIO_KEY=${MINIO_KEY:-minioadmin}
@@ -85,7 +85,7 @@ GROUP BY 1,2 ORDER BY 1,2;"
 
 The dashboard reads the **Gold** table from MinIO and visualizes daily model cost & p95 latency.
 
-```bash
+
 # Reuse env (override if needed)
 export MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://localhost:9000}
 export MINIO_KEY=${MINIO_KEY:-minioadmin}
@@ -110,7 +110,7 @@ Empty charts → make sure Steps 2–4 ran and the gold/model_daily/... parquet 
 
 If you created `scripts/run_all.sh`, you can run the whole pipeline in one go:
 
-```bash
+
 # Defaults: EPS=3 SECONDS_RUN=30 PORT=8502
 bash scripts/run_all.sh
 Override at run time:
@@ -128,7 +128,7 @@ docker compose down
 Stop the dashboard (Ctrl + C in the Streamlit terminal).
 
 Stop containers:
-```bash
+
 docker compose down
 Remove containers + volumes (wipes MinIO data):
 docker compose down -v
@@ -143,7 +143,7 @@ rm -rf .venv
 
 You can preview the dashboard using the bundled sample file `demo_data/gold_sample.parquet`.
 
-```bash
+
 python3 -m venv .venv && source .venv/bin/activate
 pip install -U pip -r requirements.txt
 STREAMLIT_SERVER_PORT=8502 streamlit run dashboard/app.py
