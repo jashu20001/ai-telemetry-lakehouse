@@ -4,7 +4,7 @@ Local LLM telemetry pipeline: **Redpanda (Kafka) → MinIO (S3) → DuckDB → S
 You can generate synthetic events, land them in S3 (Bronze), transform to Silver/Gold with DuckDB, and explore them in a Streamlit dashboard.
 
 This README will be built step-by-step. Next we’ll add architecture, prerequisites, and exact run commands.
-## ✅ Prerequisites
+## Prerequisites
 
 - **Docker Desktop** (for Redpanda & MinIO)
 - **Python 3.10+** with `pip`
@@ -17,7 +17,7 @@ This README will be built step-by-step. Next we’ll add architecture, prerequis
 - **Command-line tools**: `git`, `curl`, `bash`, `docker`, `docker compose`
 
 > If any port above is already in use, stop the conflicting service or change the port in `docker-compose.yml`.
-## 🚀 Quickstart
+## Quickstart
 
 ### 1) Start the infrastructure
 
@@ -123,7 +123,7 @@ Launches the Streamlit dashboard on $PORT.
 Stop Streamlit with Ctrl + C.
 To stop the containers:
 docker compose down
-## 🧹 Teardown & Cleanup
+## Teardown & Cleanup
 
 Stop the dashboard (Ctrl + C in the Streamlit terminal).
 
@@ -135,11 +135,11 @@ docker compose down -v
 If you want to delete your local virtualenv:
 rm -rf .venv
 
-## 📸 Dashboard preview
+##  Dashboard preview
 
 ![LLM Pulse Dashboard](docs/dashboard.png)
 
-## 🚀 Try the dashboard (demo mode — no Kafka/MinIO needed)
+##  Try the dashboard (demo mode — no Kafka/MinIO needed)
 
 You can preview the dashboard using the bundled sample file `demo_data/gold_sample.parquet`.
 
