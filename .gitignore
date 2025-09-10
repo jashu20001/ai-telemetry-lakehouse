@@ -1,9 +1,31 @@
-.venv/
+# Python
 __pycache__/
 *.pyc
-minio_data/
-*.parquet
-.env
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+*.sqlite
+.ipynb_checkpoints/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Mac / OS
 .DS_Store
+
+# Local data & artifacts
+data/
+tmp/
+.cache/
+.parquet/
+*.parquet
+
+# IDEs
 .vscode/
 .idea/
+
+# Docker
+*.log
