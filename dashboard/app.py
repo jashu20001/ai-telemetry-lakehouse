@@ -1,108 +1,72 @@
 import os
-import pandas as pd
 import duckdb
+import pandas as pd
 import streamlit as st
-import altair as alt
 
-# --- MinIO (S3) settings ---
-# Use host:port (no http://). We tell DuckDB to use http via s3_use_ssl=0.
-S3_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-S3_KEY = os.getenv("MINIO_KEY", "minioadmin")
-S3_SECRET = os.getenv("MINIO_SECRET", "minioadmin")
-BUCKET = os.getenv("LP_BUCKET", "llm-pulse")
-GOLD_PATH = f"s3://{BUCKET}/gold/model_daily/day=*/**/*.parquet"
+st.set_page_config(page_title="LLM Pulse — Cost & Latency", layout="wide")
 
-def connect_duck():
+DEMO_FILE = "demo_data/gold_sample.parquet"
+
+def read_gold():
     con = duckdb.connect()
-    con.execute("INSTALL httpfs; LOAD httpfs;")
-    con.execute("SET s3_region='us-east-1'")
-    con.execute("SET s3_endpoint=?", [S3_ENDPOINT])          # e.g., localhost:9000
-    con.execute("SET s3_access_key_id=?", [S3_KEY])
-    con.execute("SET s3_secret_access_key=?", [S3_SECRET])
-    con.execute("SET s3_use_ssl=0")                           # 0 = http
-    con.execute("SET s3_url_style='path'")
-    return con
-
-@st.cache_data(ttl=60)
-def load_gold() -> pd.DataFrame:
-    con = connect_duck()
     try:
-        df = con.sql(f"""
-            SELECT
-              CAST(day AS DATE) AS day,
-              model,
-              requests,
-              p95_latency_ms,
-              total_cost_usd,
-              error_rate
-            FROM read_parquet('{GOLD_PATH}')
-        """).df()
+        if os.path.exists(DEMO_FILE):
+            df = con.execute(f"SELECT * FROM read_parquet('{DEMO_FILE}')").df()
+        else:
+            # Fall back to MinIO (S3 compatible)
+            endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+            bucket   = os.getenv("LP_BUCKET", "llm-pulse")
+            key      = os.getenv("MINIO_KEY", "minioadmin")
+            secret   = os.getenv("MINIO_SECRET", "minioadmin")
+            s3_path  = f"s3://{bucket}/gold/model_daily/**/*.parquet"
+
+            con.execute("""
+              SET s3_region='us-east-1';
+              SET s3_endpoint=$endpoint;
+              SET s3_access_key_id=$key;
+              SET s3_secret_access_key=$secret;
+              SET s3_url_style='path';
+              SET s3_use_ssl=false;
+            """, {'endpoint': endpoint, 'key': key, 'secret': secret})
+
+            df = con.execute(
+                f"SELECT * FROM read_parquet('{s3_path}', hive_partitioning=1)"
+            ).df()
+        return df
     finally:
         con.close()
-    if df.empty:
-        return df
-    df["day"] = pd.to_datetime(df["day"]).dt.date
-    return df
 
-st.set_page_config(page_title="LLM Pulse Dashboard", layout="wide")
+df = read_gold()
+df["day"] = pd.to_datetime(df["day"])
+
 st.title("LLM Pulse — Cost & Latency Dashboard")
 
-df = load_gold()
-if df.empty:
-    st.info("No Gold data found yet. Run generator → ingestor → transform, then refresh.")
-    st.stop()
-
-# ---- Filters ----
-min_day, max_day = df["day"].min(), df["day"].max()
-
-# If only one day exists, avoid a range slider
-if min_day == max_day:
-    st.caption(f"Only one day of data available: **{min_day}**")
-    day_range = (min_day, max_day)
-else:
-    day_range = st.slider(
-        "Date range",
-        min_value=min_day,
-        max_value=max_day,
-        value=(min_day, max_day),
-    )
-
+# Filters
 models = sorted(df["model"].unique().tolist())
-selected_models = st.multiselect("Models", options=models, default=models)
+selected = st.multiselect("Models", models, default=models)
 
-mask = (
-    (df["day"] >= day_range[0]) &
-    (df["day"] <= day_range[1]) &
-    (df["model"].isin(selected_models))
-)
-df_f = df.loc[mask].copy()
+fdf = df[df["model"].isin(selected)]
 
-# ---- Top KPIs ----
-left, mid, right, right2 = st.columns(4)
-left.metric("Total Requests", int(df_f["requests"].sum()))
-mid.metric("Total Cost (USD)", f"{df_f['total_cost_usd'].sum():.4f}")
-right.metric("Global p95 Latency (ms)", int(df_f["p95_latency_ms"].quantile(0.95)) if not df_f.empty else 0)
-right2.metric("Avg Error Rate", f"{(df_f['error_rate'].mean() if not df_f.empty else 0):.2%}")
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Requests", int(fdf["requests"].sum()))
+col2.metric("Total Cost (USD)", f"{fdf['total_cost_usd'].sum():.4f}")
+col3.metric("Global p95 Latency (ms)", int(fdf["p95_latency_ms"].mean()))
+col4.metric("Avg Error Rate", f"{fdf['error_rate'].mean()*100:.2f}%")
 
-# ---- Charts ----
+# p95 latency by day & model
 st.subheader("p95 Latency by Day & Model")
-lat_chart = alt.Chart(df_f).mark_line(point=True).encode(
-    x="day:T",
-    y="p95_latency_ms:Q",
-    color="model:N",
-    tooltip=["day","model","p95_latency_ms"]
-).properties(height=300)
-st.altair_chart(lat_chart, use_container_width=True)
+lat = (fdf.groupby(["day","model"])["p95_latency_ms"]
+          .mean().reset_index().sort_values("day"))
+st.line_chart(lat.pivot(index="day", columns="model", values="p95_latency_ms"))
 
+# Cost by day & model
 st.subheader("Total Cost by Day & Model")
-cost_chart = alt.Chart(df_f).mark_bar().encode(
-    x="day:T",
-    y="sum(total_cost_usd):Q",
-    color="model:N",
-    tooltip=["day","model","total_cost_usd"]
-).properties(height=300)
-st.altair_chart(cost_chart, use_container_width=True)
+cost = (fdf.groupby(["day","model"])["total_cost_usd"]
+          .sum().reset_index().sort_values("day"))
+st.bar_chart(cost.pivot(index="day", columns="model", values="total_cost_usd"))
 
 st.subheader("Details")
-st.dataframe(df_f.sort_values(["day","model"]).reset_index(drop=True))
-
+st.dataframe(
+    fdf[["day","model","requests","p95_latency_ms","total_cost_usd","error_rate"]]
+      .sort_values(["day","model"]).reset_index(drop=True)
+)
