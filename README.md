@@ -134,3 +134,7 @@ Remove containers + volumes (wipes MinIO data):
 docker compose down -v
 If you want to delete your local virtualenv:
 rm -rf .venv
+
+## 📸 Dashboard preview
+
+![LLM Pulse Dashboard](docs/dashboard.png)
