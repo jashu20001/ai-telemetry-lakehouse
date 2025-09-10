@@ -138,3 +138,14 @@ rm -rf .venv
 ## 📸 Dashboard preview
 
 ![LLM Pulse Dashboard](docs/dashboard.png)
+
+## 🚀 Try the dashboard (demo mode — no Kafka/MinIO needed)
+
+You can preview the dashboard using the bundled sample file `demo_data/gold_sample.parquet`.
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -U pip -r requirements.txt
+STREAMLIT_SERVER_PORT=8502 streamlit run dashboard/app.py
+The app will prefer the local demo_data/gold_sample.parquet.
+If your MinIO is up and credentials are set, it will read the live Gold as well.
